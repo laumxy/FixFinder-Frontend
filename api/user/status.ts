@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { loadUsers, SESSIONS } from '../_users';
+import { loadUsers, SESSIONS } from '../_users.js';
 
 export default function handler(req: VercelRequest, res: VercelResponse) {
   const token = req.headers.authorization?.replace('Bearer ', '');

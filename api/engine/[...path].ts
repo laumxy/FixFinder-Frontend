@@ -3,7 +3,7 @@
  * e.g. POST /api/engine/diagnose → POST https://backend/diagnose
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { proxyToBackend } from '../_proxy';
+import { proxyToBackend } from '../_proxy.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // req.query.path is an array of path segments from [...path]

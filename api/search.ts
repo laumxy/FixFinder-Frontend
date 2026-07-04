@@ -1,7 +1,28 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { loadUsers, saveUsers, SESSIONS } from './_users';
-import { proxyToBackend } from './_proxy';
-import { backendResultToSolutionItem } from '../src/solutionsData';
+import { loadUsers, saveUsers, SESSIONS } from './_users.js';
+import { proxyToBackend } from './_proxy.js';
+
+/** Convert a raw Python backend diagnosis response to the SolutionItem shape. */
+function backendResultToSolutionItem(raw: any, query: string): any {
+  return {
+    id: `diag-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    category: raw.category || 'general',
+    problem: raw.problem || query,
+    solution: raw.final_answer || '',
+    steps: Array.isArray(raw.repair_steps) ? raw.repair_steps : [],
+    keywords: Array.isArray(raw.ranked_causes) ? raw.ranked_causes : [],
+    observedSymptoms: Array.isArray(raw.symptoms) ? raw.symptoms : [],
+    requiredTools: Array.isArray(raw.tools) ? raw.tools : [],
+    safetyPrecautions: Array.isArray(raw.safety) ? raw.safety : [],
+    inspectionSteps: Array.isArray(raw.inspection_steps) ? raw.inspection_steps : [],
+    preventionAdvice: Array.isArray(raw.prevention) ? raw.prevention : [],
+    repairPriority: raw.risk_level === 'high' ? 'High' : raw.risk_level === 'low' ? 'Low' : 'Medium',
+    estimatedTime: raw.estimated_time || 'unknown',
+    estimatedCost: raw.estimated_cost || 'unknown',
+    confidenceLevels: Array.isArray(raw.confidence_scores) ? raw.confidence_scores : [],
+    _raw: raw,
+  };
+}
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
@@ -18,7 +39,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!user) return res.status(404).json({ error: 'User not found' });
 
   if (user.tier === 'free') {
-    if (user.searchesRemaining <= 0) return res.status(403).json({ error: 'Search limit reached', limitReached: true });
+    if (user.searchesRemaining <= 0) {
+      return res.status(403).json({ error: 'Search limit reached', limitReached: true });
+    }
     user.searchesRemaining--;
     users[email] = user;
     saveUsers(users);
