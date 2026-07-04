@@ -1,14 +1,14 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { loadUsers, SESSIONS } from '../_users.js';
+import { getUser, getSessionEmail } from '../_users.js';
 
-export default function handler(req: VercelRequest, res: VercelResponse) {
+export default async function handler(req: VercelRequest, res: VercelResponse) {
   const token = req.headers.authorization?.replace('Bearer ', '');
-  const email = token ? SESSIONS[token] : undefined;
+  if (!token) return res.json({ loggedIn: false, user: null });
 
+  const email = await getSessionEmail(token);
   if (!email) return res.json({ loggedIn: false, user: null });
 
-  const users = loadUsers();
-  const user = users[email];
+  const user = await getUser(email);
   if (!user) return res.json({ loggedIn: false, user: null });
 
   return res.json({

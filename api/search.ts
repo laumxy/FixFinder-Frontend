@@ -1,8 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { loadUsers, saveUsers, SESSIONS } from './_users.js';
+import { getUser, setUser, getSessionEmail } from './_users.js';
 import { proxyToBackend } from './_proxy.js';
 
-/** Convert a raw Python backend diagnosis response to the SolutionItem shape. */
 function backendResultToSolutionItem(raw: any, query: string): any {
   return {
     id: `diag-${Date.now()}-${Math.random().toString(36).slice(2)}`,
@@ -28,14 +27,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
 
   const token = req.headers.authorization?.replace('Bearer ', '');
-  const email = token ? SESSIONS[token] : undefined;
+  const email = token ? await getSessionEmail(token) : null;
   if (!email) return res.status(401).json({ error: 'Authentication required. Please sign in.' });
 
   const query = req.query.q as string;
   if (!query?.trim()) return res.json({ results: [] });
 
-  const users = loadUsers();
-  const user = users[email];
+  const user = await getUser(email);
   if (!user) return res.status(404).json({ error: 'User not found' });
 
   if (user.tier === 'free') {
@@ -43,8 +41,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(403).json({ error: 'Search limit reached', limitReached: true });
     }
     user.searchesRemaining--;
-    users[email] = user;
-    saveUsers(users);
+    await setUser(user);
   }
 
   const { status, data: raw } = await proxyToBackend(
