@@ -1,0 +1,8 @@
+{
+  "name": "Remix: RV Pro Troubleshooter",
+  "description": "Your offline RV mechanic. Diagnose and fix common RV issues step-by-step without cell signals.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

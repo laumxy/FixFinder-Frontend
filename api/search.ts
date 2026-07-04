@@ -1,5 +1,4 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { getUser, setUser, getSessionEmail } from './_users.js';
 import { proxyToBackend } from './_proxy.js';
 
 function backendResultToSolutionItem(raw: any, query: string): any {
@@ -26,37 +25,25 @@ function backendResultToSolutionItem(raw: any, query: string): any {
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
 
-  const token = req.headers.authorization?.replace('Bearer ', '');
-  const email = token ? await getSessionEmail(token) : null;
-  if (!email) return res.status(401).json({ error: 'Authentication required. Please sign in.' });
+  const authHeader = req.headers.authorization;
+  if (!authHeader) return res.status(401).json({ error: 'Authentication required. Please sign in.' });
 
   const query = req.query.q as string;
   if (!query?.trim()) return res.json({ results: [] });
-
-  const user = await getUser(email);
-  if (!user) return res.status(404).json({ error: 'User not found' });
-
-  if (user.tier === 'free') {
-    if (user.searchesRemaining <= 0) {
-      return res.status(403).json({ error: 'Search limit reached', limitReached: true });
-    }
-    user.searchesRemaining--;
-    await setUser(user);
-  }
 
   const { status, data: raw } = await proxyToBackend(
     '/diagnose',
     'POST',
     { problem: query },
-    token ? `Bearer ${token}` : undefined
+    authHeader
   );
 
   if (status !== 200 || !raw) {
     return res.status(status).json({
       results: [],
       reasoningSteps: ['[ERROR] Diagnostic engine returned an error. Please try again.'],
-      searchesRemaining: user.searchesRemaining,
-      tier: user.tier,
+      searchesRemaining: 99,
+      tier: 'free',
     });
   }
 
@@ -72,7 +59,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   return res.json({
     results: [{ item: solutionItem, score: 98 }],
     reasoningSteps,
-    searchesRemaining: user.searchesRemaining,
-    tier: user.tier,
+    searchesRemaining: 99,
+    tier: 'free',
   });
 }

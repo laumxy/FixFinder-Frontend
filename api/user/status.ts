@@ -1,18 +1,32 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { getUser, getSessionEmail } from '../_users.js';
+import { BACKEND_URL } from '../_proxy.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  const token = req.headers.authorization?.replace('Bearer ', '');
-  if (!token) return res.json({ loggedIn: false, user: null });
+  const authHeader = req.headers.authorization;
+  if (!authHeader) return res.json({ loggedIn: false, user: null });
 
-  const email = await getSessionEmail(token);
-  if (!email) return res.json({ loggedIn: false, user: null });
+  try {
+    // Verify token with the backend by hitting a protected endpoint
+    const backendRes = await fetch(`${BACKEND_URL}/users`, {
+      headers: { Authorization: authHeader },
+    });
 
-  const user = await getUser(email);
-  if (!user) return res.json({ loggedIn: false, user: null });
+    if (!backendRes.ok) return res.json({ loggedIn: false, user: null });
 
-  return res.json({
-    loggedIn: true,
-    user: { email: user.email, tier: user.tier, searchesRemaining: user.searchesRemaining, createdAt: user.createdAt },
-  });
+    // Token is valid — decode email from JWT payload (base64 middle segment)
+    const token = authHeader.replace('Bearer ', '');
+    const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString());
+
+    return res.json({
+      loggedIn: true,
+      user: {
+        email: payload.username || payload.sub || '',
+        tier: 'free',
+        searchesRemaining: 3,
+        createdAt: new Date().toISOString(),
+      },
+    });
+  } catch {
+    return res.json({ loggedIn: false, user: null });
+  }
 }
