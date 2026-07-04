@@ -1,0 +1,138 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", sans-serif;
+  --font-serif: "Cormorant Garamond", serif;
+}
+
+:root {
+  --color-canvas-bg: #FAF9F6; /* Luxury ivory slate background */
+  --color-canvas-text: #334155; /* Slate secondary */
+  --color-panel-bg: rgba(255, 255, 255, 0.75); /* Frost white glass */
+  --color-panel-border: rgba(0, 0, 0, 0.06); /* Razor thin dark borders */
+  --color-grid-dots: rgba(0, 0, 0, 0.08); /* Precise dark grid dots */
+  --color-title-text: #0F172A; /* Slate 900 headers */
+  --color-subtle-card: rgba(0, 0, 0, 0.02);
+  --color-subtle-card-hover: rgba(0, 0, 0, 0.04);
+  --color-subtle-border: rgba(0, 0, 0, 0.04);
+  --color-aura-purple: rgba(139, 92, 246, 0.04); /* Softer light-leak for light theme */
+  --color-aura-blue: rgba(59, 130, 246, 0.04);
+  --color-aura-emerald: rgba(16, 185, 129, 0.02);
+  --color-btn-alt-bg: rgba(0, 0, 0, 0.03);
+}
+
+.dark {
+  --color-canvas-bg: #000000; /* Absolute pitch-black base */
+  --color-canvas-text: #D1D5DB; /* Silver-gray text */
+  --color-panel-bg: rgba(11, 15, 25, 0.8); /* Slate-black glass */
+  --color-panel-border: rgba(255, 255, 255, 0.08); /* White glassmorphism border */
+  --color-grid-dots: rgba(255, 255, 255, 0.12); /* Tiny glowing dots */
+  --color-title-text: #FFFFFF; /* Crisp white headers */
+  --color-subtle-card: rgba(255, 255, 255, 0.02);
+  --color-subtle-card-hover: rgba(255, 255, 255, 0.04);
+  --color-subtle-border: rgba(255, 255, 255, 0.04);
+  --color-aura-purple: rgba(139, 92, 246, 0.15); /* Vibrant cyber glows */
+  --color-aura-blue: rgba(59, 130, 246, 0.15);
+  --color-aura-emerald: rgba(16, 185, 129, 0.10);
+  --color-btn-alt-bg: #0B0F19;
+}
+
+/* Base custom classes for high-fidelity cyber design */
+.bg-grid {
+  background-image: radial-gradient(var(--color-grid-dots) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+
+/* Glowing cyberpunk animations */
+@keyframes float-purple {
+  0%, 100% {
+    transform: translate(0px, 0px) scale(1);
+    opacity: 0.6;
+  }
+  50% {
+    transform: translate(30px, -20px) scale(1.15);
+    opacity: 1;
+  }
+}
+
+@keyframes float-blue {
+  0%, 100% {
+    transform: translate(0px, 0px) scale(1.1);
+    opacity: 0.6;
+  }
+  50% {
+    transform: translate(-40px, 30px) scale(0.95);
+    opacity: 1;
+  }
+}
+
+@keyframes float-emerald {
+  0%, 100% {
+    transform: translate(0px, 0px) scale(0.95);
+    opacity: 0.4;
+  }
+  50% {
+    transform: translate(20px, 40px) scale(1.1);
+    opacity: 0.8;
+  }
+}
+
+.animate-float-purple {
+  animation: float-purple 18s ease-in-out infinite;
+}
+
+.animate-float-blue {
+  animation: float-blue 22s ease-in-out infinite;
+}
+
+.animate-float-emerald {
+  animation: float-emerald 20s ease-in-out infinite;
+}
+
+/* Elegant glass-blur container scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.1);
+}
+
+.dark ::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 99px;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.25);
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+/* Ambient glow animations for buttons and borders */
+.glow-border-purple {
+  box-shadow: 0 0 15px rgba(139, 92, 246, 0.15);
+}
+.glow-border-blue {
+  box-shadow: 0 0 15px rgba(59, 130, 246, 0.15);
+}
+.glow-border-emerald {
+  box-shadow: 0 0 15px rgba(16, 185, 129, 0.15);
+}
+.glow-text-purple {
+  text-shadow: 0 0 8px rgba(139, 92, 246, 0.4);
+}
+.glow-text-emerald {
+  text-shadow: 0 0 8px rgba(16, 185, 129, 0.4);
+}
