@@ -1,15 +1,13 @@
 /**
- * Persistent user + session store backed by Vercel KV (Redis).
- * This replaces the broken in-memory store — each serverless function
- * invocation is its own process, so in-memory state never survives
- * across register → login calls.
+ * Persistent user + session store backed by Vercel Blob.
+ * Stores two JSON blobs: "users.json" and "sessions.json".
+ * No external database needed — Blob is available on all Vercel plans.
  *
- * Setup (one-time, free):
- *   Vercel Dashboard → Storage → Create KV database → Connect to this project.
- *   Vercel auto-injects KV_URL, KV_REST_API_URL, KV_REST_API_TOKEN env vars.
+ * Requires env var: BLOB_READ_WRITE_TOKEN
+ * (auto-injected when you connect a Blob store in Vercel → Storage → Blob)
  */
 
-import { kv } from '@vercel/kv';
+import { put, head, getDownloadUrl } from '@vercel/blob';
 
 export interface User {
   email: string;
@@ -19,31 +17,66 @@ export interface User {
   createdAt: string;
 }
 
+type UserStore = Record<string, User>;
+type SessionStore = Record<string, { email: string; expiresAt: number }>;
+
+const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+
+// ── Blob helpers ──────────────────────────────────────────────────────────────
+
+async function readBlob<T>(filename: string, fallback: T): Promise<T> {
+  try {
+    const result = await head(filename);
+    if (!result?.url) return fallback;
+    const res = await fetch(result.url);
+    if (!res.ok) return fallback;
+    return (await res.json()) as T;
+  } catch {
+    return fallback;
+  }
+}
+
+async function writeBlob(filename: string, data: unknown): Promise<void> {
+  await put(filename, JSON.stringify(data), {
+    access: 'public',
+    addRandomSuffix: false,
+    contentType: 'application/json',
+  });
+}
+
 // ── Users ─────────────────────────────────────────────────────────────────────
 
 export async function getUser(email: string): Promise<User | null> {
-  return kv.get<User>(`user:${email.toLowerCase()}`);
+  const store = await readBlob<UserStore>('fixfinder-users.json', {});
+  return store[email.toLowerCase()] ?? null;
 }
 
 export async function setUser(user: User): Promise<void> {
-  await kv.set(`user:${user.email.toLowerCase()}`, user);
+  const store = await readBlob<UserStore>('fixfinder-users.json', {});
+  store[user.email.toLowerCase()] = user;
+  await writeBlob('fixfinder-users.json', store);
 }
 
 // ── Sessions ──────────────────────────────────────────────────────────────────
 
-// Sessions expire after 7 days
-const SESSION_TTL_SECONDS = 60 * 60 * 24 * 7;
-
 export async function createSession(email: string): Promise<string> {
+  const store = await readBlob<SessionStore>('fixfinder-sessions.json', {});
   const token = Math.random().toString(36).substring(2) + Date.now().toString(36);
-  await kv.set(`session:${token}`, email.toLowerCase(), { ex: SESSION_TTL_SECONDS });
+  store[token] = { email: email.toLowerCase(), expiresAt: Date.now() + SESSION_TTL_MS };
+  await writeBlob('fixfinder-sessions.json', store);
   return token;
 }
 
 export async function getSessionEmail(token: string): Promise<string | null> {
-  return kv.get<string>(`session:${token}`);
+  const store = await readBlob<SessionStore>('fixfinder-sessions.json', {});
+  const session = store[token];
+  if (!session) return null;
+  if (session.expiresAt < Date.now()) return null;
+  return session.email;
 }
 
 export async function deleteSession(token: string): Promise<void> {
-  await kv.del(`session:${token}`);
+  const store = await readBlob<SessionStore>('fixfinder-sessions.json', {});
+  delete store[token];
+  await writeBlob('fixfinder-sessions.json', store);
 }
