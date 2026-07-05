@@ -120,7 +120,76 @@ async function handleConverseV2(
     return;
   }
 
+  // ── RQU: Parse query into structured understanding → drive version + safety ─
+  let rquVersion  = 0;
+  let rquSafety   = '';
+
+  try {
+    const { status: rs, data: ruo } = await proxyToBackend(
+      '/v2/understand', 'POST', { query: text }, authHeader
+    );
+    if (rs === 200 && ruo) {
+      rquSafety = ruo.safety_risk || '';
+      const catMap: Record<string, number> = {
+        'Home Maintenance': 1, 'Electronics': 2, 'Industrial / Automotive': 3,
+      };
+      rquVersion = catMap[ruo.equipment_category as string] || 0;
+
+      // Immediate safety escalation — short-circuit before DB search
+      if (rquSafety && rquSafety !== 'none detected') {
+        const safetySteps: Record<string, string[]> = {
+          'gas leak': [
+            '  1. Shut OFF propane at the tank valve — turn clockwise until tight.',
+            '  2. Open all windows and doors. Do NOT use switches or open flames.',
+            '  3. Exit the RV / building immediately.',
+            '  4. Do NOT re-enter until a certified gas technician clears the area.',
+            '  5. Call your RV dealer, a certified gas tech, or 911.',
+          ],
+          'electrical hazard': [
+            '  1. Turn OFF the main circuit breaker or disconnect shore power NOW.',
+            '  2. Do NOT touch any wiring, panels, or outlets.',
+            '  3. Call a licensed electrician before restoring power.',
+          ],
+          'carbon monoxide': [
+            '  1. Evacuate everyone immediately.',
+            '  2. Call 911.',
+            '  3. Do NOT re-enter until cleared by emergency services.',
+          ],
+          'fire risk': [
+            '  1. Evacuate immediately.',
+            '  2. Call 911.',
+            '  3. Do NOT attempt to fight the fire yourself.',
+          ],
+        };
+        const steps = safetySteps[rquSafety] || [
+          '  1. Stop using the affected equipment immediately.',
+          '  2. Consult a certified technician before proceeding.',
+        ];
+        const safetyMsg = [
+          `⚠️ **Safety alert: ${rquSafety.toUpperCase()} DETECTED**`,
+          '',
+          '**Take these steps immediately:**',
+          ...steps,
+          '',
+          'Once the area is safe, describe the specific repair and I will guide you.',
+        ].join('\n');
+
+        sessionCache.set(sid, { message: safetyMsg, fullMessage: safetyMsg });
+        res.json({
+          message: safetyMsg,
+          questions: ['Area is safe — help me with the repair now'],
+          session_id: sid,
+          type: 'safety_alert',
+          confidence: 1.0,
+          safety_risk: rquSafety,
+        });
+        return;
+      }
+    }
+  } catch { /* RQU optional — continue without it */ }
+
   // ── Analyze symptoms across all 3 versions in parallel ──────────────────
+  // RQU version hint boosts domain matching accuracy when available
   const analyzeResults = await Promise.allSettled(
     [1, 2, 3].map(async (version) => {
       const { status, data } = await proxyToBackend(
@@ -143,7 +212,9 @@ async function handleConverseV2(
     const { version, matches } = r.value;
     for (const m of matches) {
       const boost = domainBoost(text, version);
-      ranked.push({ version, match: m, adjustedScore: (m.score || 0) + boost });
+      // Extra +0.15 when RQU confirmed this version
+      const rquBoost = (rquVersion === version) ? 0.15 : 0;
+      ranked.push({ version, match: m, adjustedScore: (m.score || 0) + boost + rquBoost });
     }
   }
 

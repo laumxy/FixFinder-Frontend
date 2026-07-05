@@ -120,6 +120,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   ];
 
   // ── Step 1: Analyze symptoms across all 3 versions ──────────────────────
+  // Run RQU first to get a version hint and detect safety risks
+  let rquVersionHint = 0;
+  try {
+    const { status: rs, data: ruo } = await proxyToBackend(
+      '/v2/understand', 'POST', { query }, authHeader
+    );
+    if (rs === 200 && ruo) {
+      const catMap: Record<string, number> = {
+        'Home Maintenance': 1, 'Electronics': 2, 'Industrial / Automotive': 3,
+      };
+      rquVersionHint = catMap[ruo.equipment_category as string] || 0;
+    }
+  } catch { /* optional */ }
+
   const analyzeSettled = await Promise.allSettled(
     [1, 2, 3].map(async (version) => {
       const { status, data } = await proxyToBackend(
