@@ -20,7 +20,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.json({
       loggedIn: true,
       user: {
-        email: payload.username || payload.sub || '',
+        email: payload.usr || '',
         tier: 'free',
         searchesRemaining: 3,
         createdAt: new Date().toISOString(),
