@@ -3,7 +3,7 @@
  * e.g. POST /api/engine/diagnose → POST https://backend/diagnose
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { proxyToBackend } from '../_proxy.js';
+import { proxyToBackend, BACKEND_URL } from '../_proxy.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // req.query.path is an array of path segments from [...path]
@@ -12,8 +12,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const qs = req.url?.includes('?') ? req.url.slice(req.url.indexOf('?')) : '';
   const method = req.method || 'GET';
+  const fullUrl = `${BACKEND_URL}${backendPath}${qs}`;
   
-  console.log(`[engine-proxy] ${method} ${backendPath}${qs}`);
+  console.log(`[engine-proxy] ${method} ${fullUrl}`);
+  console.log(`[engine-proxy] Body: ${JSON.stringify(req.body)}`);
   
   const { status, data } = await proxyToBackend(
     backendPath + qs,
@@ -22,6 +24,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     req.headers.authorization
   );
   
-  console.log(`[engine-proxy] Response: ${status}`);
+  console.log(`[engine-proxy] Response: ${status}`, JSON.stringify(data).substring(0, 200));
   return res.status(status).json(data);
 }
