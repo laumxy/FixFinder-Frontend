@@ -63,6 +63,20 @@ interface ChatMessage {
   timestamp: Date;
 }
 
+// ── Inline text renderer: handles **bold** within a single line ──────────────
+function renderInline(text: string, resolvedTheme: 'light' | 'dark'): React.ReactNode {
+  if (!text.includes('**')) return text;
+  return (
+    <>
+      {text.split('**').map((part, i) =>
+        i % 2 === 1
+          ? <strong key={i} className={resolvedTheme === 'dark' ? 'text-white' : 'text-slate-900'}>{part}</strong>
+          : <span key={i}>{part}</span>
+      )}
+    </>
+  );
+}
+
 export default function App() {
   // App States
   const [user, setUser] = useState<{
@@ -1312,15 +1326,105 @@ export default function App() {
                               ? 'bg-[#0B0F19]/80 border border-white/[0.08] rounded-2xl rounded-bl-md px-5 py-3.5'
                               : 'bg-white border border-slate-200 rounded-2xl rounded-bl-md px-5 py-3.5 shadow-sm'
                         }`}>
-                          {/* Message text with markdown-like rendering */}
-                          <div className={`text-sm leading-relaxed whitespace-pre-wrap ${
+                          {/* Structured message renderer — handles bold, bullets, numbered steps, warnings */}
+                          <div className={`text-sm leading-relaxed space-y-2 ${
                             resolvedTheme === 'dark' ? 'text-gray-200' : 'text-slate-700'
                           }`}>
-                            {msg.content.split('**').map((part, i) => (
-                              i % 2 === 1
-                                ? <strong key={i} className={resolvedTheme === 'dark' ? 'text-white' : 'text-slate-900'}>{part}</strong>
-                                : <span key={i}>{part}</span>
-                            ))}
+                            {msg.content.split('\n').map((line, li) => {
+                              const trimmed = line.trim();
+                              if (!trimmed) return <div key={li} className="h-1" />;
+
+                              // Warning lines: ⚠️ Safety note / Parts to order
+                              if (trimmed.startsWith('⚠️')) {
+                                const rest = trimmed.slice(2).trim();
+                                return (
+                                  <div key={li} className={`flex gap-2 text-xs rounded-xl px-4 py-3 border ${
+                                    resolvedTheme === 'dark'
+                                      ? 'bg-amber-500/10 border-amber-500/25 text-amber-300'
+                                      : 'bg-amber-50 border-amber-200 text-amber-700'
+                                  }`}>
+                                    <span className="shrink-0">⚠️</span>
+                                    <span>{renderInline(rest, resolvedTheme)}</span>
+                                  </div>
+                                );
+                              }
+
+                              // Section header lines: **Header:**
+                              if (/^\*\*[^*]+[:？]\*\*$/.test(trimmed) || /^\*\*[^*]+\*\*:?$/.test(trimmed)) {
+                                const label = trimmed.replace(/\*\*/g, '').replace(/:$/, '');
+                                return (
+                                  <p key={li} className={`font-bold text-xs uppercase tracking-widest pt-2 pb-0.5 font-mono ${
+                                    resolvedTheme === 'dark' ? 'text-[#8B5CF6]' : 'text-[#6D28D9]'
+                                  }`}>{label}</p>
+                                );
+                              }
+
+                              // Bullet point lines: • item or  • item
+                              if (trimmed.startsWith('•') || trimmed.startsWith('-  ')) {
+                                const text = trimmed.replace(/^[•\-]\s*/, '');
+                                return (
+                                  <div key={li} className="flex gap-2.5 items-start pl-2">
+                                    <span className={`shrink-0 mt-0.5 w-1.5 h-1.5 rounded-full ${
+                                      resolvedTheme === 'dark' ? 'bg-[#8B5CF6]' : 'bg-[#6D28D9]'
+                                    }`} style={{ marginTop: '6px' }} />
+                                    <span className="text-sm">{renderInline(text, resolvedTheme)}</span>
+                                  </div>
+                                );
+                              }
+
+                              // Numbered repair steps: "  1. [Pre-checks]" or "  3. Step title"
+                              const numberedMatch = trimmed.match(/^(\d+)\.\s+(.+)$/);
+                              if (numberedMatch) {
+                                const num = numberedMatch[1];
+                                const text = numberedMatch[2];
+                                const isPrePost = /^\[.+\]$/.test(text);
+                                return (
+                                  <div key={li} className={`flex gap-3 items-start rounded-xl px-4 py-2.5 border transition-colors ${
+                                    resolvedTheme === 'dark'
+                                      ? 'bg-white/[0.02] border-white/[0.05]'
+                                      : 'bg-slate-50 border-slate-200/80'
+                                  }`}>
+                                    <span className={`w-7 h-7 rounded-lg flex items-center justify-center text-[11px] font-bold font-mono shrink-0 ${
+                                      resolvedTheme === 'dark'
+                                        ? 'bg-[#8B5CF6]/20 text-[#8B5CF6] border border-[#8B5CF6]/30'
+                                        : 'bg-[#8B5CF6]/10 text-[#6D28D9] border border-[#8B5CF6]/20'
+                                    }`}>{num}</span>
+                                    <span className={`text-sm font-medium ${
+                                      isPrePost
+                                        ? resolvedTheme === 'dark' ? 'text-[#3B82F6]' : 'text-blue-600'
+                                        : resolvedTheme === 'dark' ? 'text-gray-200' : 'text-slate-700'
+                                    }`}>{renderInline(text, resolvedTheme)}</span>
+                                  </div>
+                                );
+                              }
+
+                              // Continuation lines (indented under steps):  "   • Check X" or "   … +N more"
+                              if (line.startsWith('     ') || line.startsWith('   ')) {
+                                const inner = trimmed.replace(/^[•]\s*/, '');
+                                if (inner.startsWith('…') || inner.startsWith('...')) {
+                                  return (
+                                    <p key={li} className={`text-xs italic pl-10 ${
+                                      resolvedTheme === 'dark' ? 'text-gray-500' : 'text-slate-400'
+                                    }`}>{inner}</p>
+                                  );
+                                }
+                                return (
+                                  <div key={li} className="flex gap-2 pl-10 items-start">
+                                    <span className={`shrink-0 text-xs mt-0.5 ${
+                                      resolvedTheme === 'dark' ? 'text-gray-600' : 'text-slate-400'
+                                    }`}>›</span>
+                                    <span className={`text-xs ${resolvedTheme === 'dark' ? 'text-gray-400' : 'text-slate-500'}`}>
+                                      {renderInline(inner, resolvedTheme)}
+                                    </span>
+                                  </div>
+                                );
+                              }
+
+                              // Plain line with possible inline bold
+                              return (
+                                <p key={li} className="text-sm">{renderInline(trimmed, resolvedTheme)}</p>
+                              );
+                            })}
                           </div>
 
                           {/* Follow-up question chips */}
