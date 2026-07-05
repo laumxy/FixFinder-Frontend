@@ -6,9 +6,13 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { proxyToBackend, BACKEND_URL } from '../_proxy.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  // req.query.path is an array of path segments from [...path]
-  const segments = Array.isArray(req.query.path) ? req.query.path : [req.query.path];
-  const backendPath = '/' + segments.join('/');
+  // Extract path from req.url since req.query.path may not work correctly
+  // req.url is like /api/engine/converse?path=converse
+  const urlPath = req.url?.split('?')[0] || '';
+  const segments = urlPath.split('/').filter(Boolean);
+  // segments = ['api', 'engine', 'converse'] -> we want ['converse']
+  const backendSegments = segments.slice(2); // skip 'api' and 'engine'
+  const backendPath = '/' + backendSegments.join('/');
 
   const qs = req.url?.includes('?') ? req.url.slice(req.url.indexOf('?')) : '';
   const method = req.method || 'GET';
@@ -18,7 +22,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   console.log(`[engine-proxy] Body: ${JSON.stringify(req.body)}`);
   
   const { status, data } = await proxyToBackend(
-    backendPath + qs,
+    backendPath,
     method,
     req.body,
     req.headers.authorization
